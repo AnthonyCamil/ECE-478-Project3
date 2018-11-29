@@ -282,11 +282,13 @@ void printCurrentAction(float time, Car *car) {
 }
 
 //===================================================================
-void acquire_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int waiting) {
+void acquire_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int waiting, Car *car) {
+    printf("\nCar %d trying to get lock for front of line in acquire_frontlock\n", car->cid);
     pthread_mutex_lock(lock);
-    printf("Got it!\n");
+    
     waiting++;
     if(waiting == 1) {
+        printf("\nCar %d is Waiting for lock\n", car->cid);
         pthread_cond_wait(nonFull, lock);
     }
     pthread_mutex_unlock(lock);
@@ -332,9 +334,10 @@ void ArriveIntersection(Car *car) {
     switch (car->dir.dir_original) {
         case 'N':
             //printf("Arriving destination = North\n");
-            printf("\nCar %d trying to get lock for front of line North\n", car->cid);
-            acquire_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
+            printf("\nCar %d trying to get lock for front of line North in ArriveIntersection\n", car->cid);
+            acquire_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth, car);
             //release_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
+            printf("\nCar %d Got it!\n", car->cid);
             
             
             break;
@@ -342,21 +345,21 @@ void ArriveIntersection(Car *car) {
         case 'S':
             //printf("Arriving destination = South\n");
             printf("\nCar %d trying to get lock for front of line South\n", car->cid);
-            acquire_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
+            acquire_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth, car);
             //release_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
             break;
             
         case 'E':
             //printf("Arriving destination = East\n");
             printf("\nCar %d trying to get lock for front of line East\n", car->cid);
-            acquire_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
+            acquire_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast, car);
             //release_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
             break;
             
         case 'W':
             //printf("Arriving destination = West\n");
             printf("\nCar %d trying to get lock for front of line West\n", car->cid);
-            acquire_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
+            acquire_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest, car);
             //release_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
             break;
         default:
@@ -408,7 +411,7 @@ void CrossIntersection(Car *car) {
     
     printCurrentAction(elapsedTime, car);
     
-    //printf("Car %d trying to release lock\n", car->cid);
+    printf("Car %d trying to release lock\n", car->cid);
     release_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
     release_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
     release_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
@@ -545,12 +548,13 @@ int main(int argc, const char * argv[]) {
     
     pthread_attr_destroy(&attr1);
     pthread_mutex_destroy(&frontLineNorth);
-    pthread_cond_destroy(&frontLineNorthCond);
     pthread_mutex_destroy(&frontLineSouth);
-    pthread_cond_destroy(&frontLineSouthCond);
     pthread_mutex_destroy(&frontLineEast);
-    pthread_cond_destroy(&frontLineEastCond);
     pthread_mutex_destroy(&frontLineWest);
+    
+    pthread_cond_destroy(&frontLineNorthCond);
+    pthread_cond_destroy(&frontLineSouthCond);
+    pthread_cond_destroy(&frontLineEastCond);
     pthread_cond_destroy(&frontLineWestCond);
     
     
