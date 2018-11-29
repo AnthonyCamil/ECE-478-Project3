@@ -13,3 +13,5 @@ For some reason car 0 and car 1 print out before car 0 trys to acquire lock.
 
 
 When I add a line in CrossIntersection() to see if a car reaches this point, the line doesn't print out. When i add a additional line to see if the car is trying to release the lock it prints that the car reaches this point, then trys printing currentAction with garbage values and gives an error.
+
+Currently when I first try to run it it does whats above. after I run it again it never gets to crossing.
