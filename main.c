@@ -25,7 +25,7 @@
 #define TIME_STRAIGHT 2
 
 int lightCycle = 0;
-float overallTime = 0;
+float elapsedTime = 0;
 
 int waitingNorth = 0;
 int waitingSouth = 0;
@@ -356,7 +356,7 @@ void ArriveIntersection(directions *dir) {
 }
 
 //-------------------------------------------------------------------
-void CrossIntersection(directions *dir) {
+void CrossIntersection(Car *car) {
     
     //If green light lock held, can go straight or turn left
     /*switch (dir->dir_target) {
@@ -378,40 +378,42 @@ void CrossIntersection(directions *dir) {
         default:
             break;
     }*/
-    if (dir->dir_original == dir->dir_target) {
-        doStraight();
+    if (car->dir.dir_original == car->dir.dir_target) {
+        elapsedTime += doStraight();
     }
-    else if (dir->dir_original == 'N') {
-        if (dir->dir_target == 'W') doTurnLeft();
-        if (dir->dir_target == 'E') doTurnRight();
+    else if (car->dir.dir_original == 'N') {
+        if (car->dir.dir_target == 'W') elapsedTime += doTurnLeft();
+        if (car->dir.dir_target == 'E') elapsedTime += doTurnRight();
+        
     }
-    else if (dir->dir_original == 'S') {
-        if (dir->dir_target == 'W') doTurnRight();
-        if (dir->dir_target == 'E') doTurnLeft();
+    else if (car->dir.dir_original == 'S') {
+        if (car->dir.dir_target == 'W') elapsedTime += doTurnRight();
+        if (car->dir.dir_target == 'E') elapsedTime += doTurnLeft();
     }
-    else if (dir->dir_original == 'E') {
-        if (dir->dir_target == 'N') doTurnLeft();
-        if (dir->dir_target == 'S') doTurnRight();
+    else if (car->dir.dir_original == 'E') {
+        if (car->dir.dir_target == 'N') elapsedTime += doTurnLeft();
+        if (car->dir.dir_target == 'S') elapsedTime += doTurnRight();
     }
-    else if (dir->dir_original == 'W') {
-        if (dir->dir_target == 'N') doTurnRight();
-        if (dir->dir_target == 'S') doTurnLeft();
+    else if (car->dir.dir_original == 'W') {
+        if (car->dir.dir_target == 'N') elapsedTime += doTurnRight();
+        if (car->dir.dir_target == 'S') elapsedTime += doTurnLeft();
     }
 }
 
-void ExitIntersection(directions *dir) {
+void ExitIntersection(Car *car) {
     
 }
 
 //-------------------------------------------------------------------
-void *Car_Arrived(void *dir) {
+void *Car_Arrived(void *arrivedCar) {
     //pthread_mutex_lock(&travelEastBound);
+    struct Car *car = arrivedCar;
     
     printf("Car Arrived\n");
     
-    ArriveIntersection(dir);
-    CrossIntersection(dir);
-    ExitIntersection(dir);
+    ArriveIntersection(&car->dir);
+    CrossIntersection(car);
+    ExitIntersection(car);
     
     pthread_exit(NULL);
 }
@@ -494,7 +496,7 @@ int main(int argc, const char * argv[]) {
         printf("cid  arrival_time  dir_original  dir_target\n");
         carInitialization(i, cars, 7);
         cars[id].arrival_time = time;
-        pthread_create(&threadid[i],&attr1, Car_Arrived, (void *) &cars[i].dir);
+        pthread_create(&threadid[i],&attr1, Car_Arrived, (void *) &cars[i]);
     }
     /*
     usleep(1.1);
