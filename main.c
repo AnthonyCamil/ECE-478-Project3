@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <assert.h>
 //#include "/Users/Anthony_Camilletti/Documents/University of Michigan Dearborn/Fall 2018/ECE 478-Operating Systems/Project 3/Project 3/mythread_new.c"
 //#include "/Users/Anthony_Camilletti/Documents/University of Michigan Dearborn/Fall 2018/ECE 478-Operating Systems/Project 3/Project 3/condvar.c"
 
@@ -22,7 +24,16 @@
 #define TIME_RIGHT_TURN 1
 #define TIME_STRAIGHT 2
 
+int lightCycle = 0;
+float overallTime = 0;
+
+int waitingNorth = 0;
+int waitingSouth = 0;
+int waitingEast = 0;
+int waitingWest = 0;
+
 typedef enum action {arriving, crossing, exiting, waiting}action;
+typedef enum objective {straight, turnLeft, turnRight} objective;
 
 pthread_mutex_t north;
 pthread_cond_t hjhk;
@@ -33,14 +44,26 @@ pthread_mutex_t lightEtoW;
 pthread_mutex_t lightWtoE;
 
 pthread_mutex_t frontLineNorth;
+pthread_cond_t frontLineNorthCond;
+
 pthread_mutex_t frontLineSouth;
+pthread_cond_t frontLineSouthCond;
+
 pthread_mutex_t frontLineEast;
-pthread_mutex_t frontLineSouth;
+pthread_cond_t frontLineEastCond;
+
+pthread_mutex_t frontLineWest;
+pthread_cond_t frontLineWestCond;
 
 pthread_mutex_t travelNorthBound;
 pthread_mutex_t travelSouthBound;
 pthread_mutex_t travelEastBound;
 pthread_mutex_t travelWestBound;
+
+pthread_mutex_t xingSouthBound;        //Used for when car dir_orig 'N' is turning left
+pthread_mutex_t xingNorthBound;        //Used for when car dir_orig 'S' is turning left
+pthread_mutex_t xingEastBound;          //Used for when car dir_orig 'W' is turning left
+pthread_mutex_t xingWestBound;          //Used for when car dir_orig 'E' is turning left
 
 
 typedef struct _directions {
@@ -53,6 +76,7 @@ typedef struct Car {
     float arrival_time;
     directions dir;
     action currentAction;
+    objective objective;
 }Car;
 
 
@@ -62,10 +86,28 @@ typedef struct Car {
     //CrossIntersection(dir);
     //ExitIntersection(dir);
 //}
+//===================================================================
+/*Used to represent time for traffic light and for time to turn*/
+double GetTime() {
+    struct timeval t;
+    int rc = gettimeofday(&t, NULL);
+    assert(rc == 0);
+    return (double)t.tv_sec + (double)t.tv_usec/1e6;
+}
+
+//-------------------------------------------------------------------
+void Spin(int howlong) {
+    double t = GetTime();
+    while((GetTime() - t) < (double)howlong);   //Does nothing
+}
+
+//===================================================================
 
 void carInitialization(int i, Car cars[], int n) {
     
     cars[i].cid = i;
+    
+    
     
     switch (i) {
         case 0:
@@ -120,7 +162,27 @@ void carInitialization(int i, Car cars[], int n) {
             break;
     }
     
-    printf("%d %6.1f %11c %13c\n", cars[i].cid, cars[i].arrival_time, cars[i].dir.dir_original, cars[i].dir.dir_target);
+    if (cars[i].dir.dir_original == cars[i].dir.dir_target) {
+        cars[i].objective = straight;
+    }
+    else if (cars[i].dir.dir_original == 'N') {
+        if (cars[i].dir.dir_target == 'W') cars[i].objective = turnLeft;
+        if (cars[i].dir.dir_target == 'E') cars[i].objective = turnRight;
+    }
+    else if (cars[i].dir.dir_original == 'S') {
+        if (cars[i].dir.dir_target == 'W') cars[i].objective = turnRight;
+        if (cars[i].dir.dir_target == 'E') cars[i].objective = turnLeft;
+    }
+    else if (cars[i].dir.dir_original == 'E') {
+        if (cars[i].dir.dir_target == 'N') cars[i].objective = turnLeft;
+        if (cars[i].dir.dir_target == 'S') cars[i].objective = turnRight;
+    }
+    else if (cars[i].dir.dir_original == 'W') {
+        if (cars[i].dir.dir_target == 'N') cars[i].objective = turnRight;
+        if (cars[i].dir.dir_target == 'S') cars[i].objective = turnLeft;
+    }
+    
+    printf("%d %6.1f %11c %13c \n", cars[i].cid, cars[i].arrival_time, cars[i].dir.dir_original, cars[i].dir.dir_target);
     
     /*printf("cid  arrival_time  dir_original  dir_target\n");
     for(int i = 0; i < 8; i++) {
@@ -219,30 +281,85 @@ void printCurrentAction(float time, Car car) {
     
 }
 
+//===================================================================
+void acquire_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int waiting) {
+    pthread_mutex_lock(lock);
+    waiting++;
+    if(waiting == 1) {
+        pthread_cond_wait(nonFull, lock);
+    }
+    pthread_mutex_unlock(lock);
+}
+
+//-------------------------------------------------------------------
+void release_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int waiting) {
+    pthread_mutex_lock(lock);
+    waiting--;
+    if(waiting == 0) {
+        pthread_cond_signal(nonFull);
+    }
+    pthread_mutex_unlock(lock);
+}
+
+//===================================================================
+float doStraight() {
+    Spin(TIME_STRAIGHT);
+    return TIME_STRAIGHT;
+}
+//-------------------------------------------------------------------
+
+float doTurnLeft() {
+    Spin(TIME_LEFT_TURN);
+    return TIME_LEFT_TURN;
+}
+
+//-------------------------------------------------------------------
+float doTurnRight() {
+    Spin(TIME_RIGHT_TURN);
+    return TIME_RIGHT_TURN;
+}
+//===================================================================
+void Traffic_Light() {
+    //changes condition when light changes
+}
+//===================================================================
 void ArriveIntersection(directions *dir) {
     switch (dir->dir_original) {
         case 'N':
             printf("Arriving destination = North\n");
+            acquire_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
+            release_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
+            
+            
             break;
         
         case 'S':
             printf("Arriving destination = South\n");
+            acquire_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
+            release_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
             break;
             
         case 'E':
             printf("Arriving destination = East\n");
+            acquire_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
+            release_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
             break;
             
         case 'W':
             printf("Arriving destination = West\n");
+            acquire_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
+            release_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
             break;
         default:
             break;
     }
 }
 
+//-------------------------------------------------------------------
 void CrossIntersection(directions *dir) {
-    switch (dir->dir_target) {
+    
+    //If green light lock held, can go straight or turn left
+    /*switch (dir->dir_target) {
         case 'N':
             printf("Target destination = North\n");
             break;
@@ -260,6 +377,25 @@ void CrossIntersection(directions *dir) {
             break;
         default:
             break;
+    }*/
+    if (dir->dir_original == dir->dir_target) {
+        doStraight();
+    }
+    else if (dir->dir_original == 'N') {
+        if (dir->dir_target == 'W') doTurnLeft();
+        if (dir->dir_target == 'E') doTurnRight();
+    }
+    else if (dir->dir_original == 'S') {
+        if (dir->dir_target == 'W') doTurnRight();
+        if (dir->dir_target == 'E') doTurnLeft();
+    }
+    else if (dir->dir_original == 'E') {
+        if (dir->dir_target == 'N') doTurnLeft();
+        if (dir->dir_target == 'S') doTurnRight();
+    }
+    else if (dir->dir_original == 'W') {
+        if (dir->dir_target == 'N') doTurnRight();
+        if (dir->dir_target == 'S') doTurnLeft();
     }
 }
 
@@ -267,6 +403,7 @@ void ExitIntersection(directions *dir) {
     
 }
 
+//-------------------------------------------------------------------
 void *Car_Arrived(void *dir) {
     //pthread_mutex_lock(&travelEastBound);
     
@@ -278,6 +415,8 @@ void *Car_Arrived(void *dir) {
     
     pthread_exit(NULL);
 }
+
+//===================================================================
 
 int main(int argc, const char * argv[]) {
     // insert code here...
@@ -292,6 +431,20 @@ int main(int argc, const char * argv[]) {
     pthread_attr_t attr1;
     pthread_attr_init(&attr1);
     pthread_t trafficlight;
+    
+    /*Initlialize mutex and condition variables for cars in line*/
+    pthread_mutex_init(&frontLineNorth, NULL);
+    pthread_cond_init(&frontLineNorthCond, NULL);
+    
+    pthread_mutex_init(&frontLineSouth, NULL);
+    pthread_cond_init(&frontLineSouthCond, NULL);
+    
+    pthread_mutex_init(&frontLineEast, NULL);
+    pthread_cond_init(&frontLineEastCond, NULL);
+    
+    pthread_mutex_init(&frontLineWest, NULL);
+    pthread_cond_init(&frontLineWestCond, NULL);
+    
     
     int id = 0;
     float time = 0;
