@@ -107,6 +107,8 @@ void carInitialization(int i, Car cars[], int n) {
     
     cars[i].cid = i;
     
+    
+    
     switch (i) {
         case 0:
             cars[i].arrival_time = 1.1;
@@ -180,7 +182,7 @@ void carInitialization(int i, Car cars[], int n) {
         if (cars[i].dir.dir_target == 'S') cars[i].objective = turnLeft;
     }
     
-    printf("%d %6.1f %11c %13c \n", cars[i].cid, cars[i].arrival_time, cars[i].dir.dir_original, cars[i].dir.dir_target);
+    //printf("%d %6.1f %11c %13c \n", cars[i].cid, cars[i].arrival_time, cars[i].dir.dir_original, cars[i].dir.dir_target);
     
     /*printf("cid  arrival_time  dir_original  dir_target\n");
     for(int i = 0; i < 8; i++) {
@@ -282,6 +284,7 @@ void printCurrentAction(float time, Car *car) {
 //===================================================================
 void acquire_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int waiting) {
     pthread_mutex_lock(lock);
+    printf("Got it!\n");
     waiting++;
     if(waiting == 1) {
         pthread_cond_wait(nonFull, lock);
@@ -292,6 +295,7 @@ void acquire_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int w
 //-------------------------------------------------------------------
 void release_frontLineLock(pthread_mutex_t *lock, pthread_cond_t *nonFull, int waiting) {
     pthread_mutex_lock(lock);
+    //printf("Released it!\n");
     waiting--;
     if(waiting == 0) {
         pthread_cond_signal(nonFull);
@@ -316,39 +320,44 @@ float doTurnRight() {
     Spin(TIME_RIGHT_TURN);
     return TIME_RIGHT_TURN;
 }
-
 //===================================================================
 void Traffic_Light() {
     //changes condition when light changes
 }
-
 //===================================================================
-void ArriveIntersection(directions *dir) {
-    switch (dir->dir_original) {
+void ArriveIntersection(Car *car) {
+    car->action = arriving;
+    printCurrentAction(car->arrival_time, car);
+    //printCurrentAction(elapsedTime, car);
+    switch (car->dir.dir_original) {
         case 'N':
-            printf("Arriving destination = North\n");
+            //printf("Arriving destination = North\n");
+            printf("\nCar %d trying to get lock for front of line North\n", car->cid);
             acquire_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
-            release_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
+            //release_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
             
             
             break;
         
         case 'S':
-            printf("Arriving destination = South\n");
+            //printf("Arriving destination = South\n");
+            printf("\nCar %d trying to get lock for front of line South\n", car->cid);
             acquire_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
-            release_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
+            //release_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
             break;
             
         case 'E':
-            printf("Arriving destination = East\n");
+            //printf("Arriving destination = East\n");
+            printf("\nCar %d trying to get lock for front of line East\n", car->cid);
             acquire_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
-            release_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
+            //release_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
             break;
             
         case 'W':
-            printf("Arriving destination = West\n");
+            //printf("Arriving destination = West\n");
+            printf("\nCar %d trying to get lock for front of line West\n", car->cid);
             acquire_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
-            release_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
+            //release_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
             break;
         default:
             break;
@@ -357,7 +366,7 @@ void ArriveIntersection(directions *dir) {
 
 //-------------------------------------------------------------------
 void CrossIntersection(Car *car) {
-    
+    printf("\nGot to crossing\n");
     //If green light lock held, can go straight or turn left
     /*switch (dir->dir_target) {
         case 'N':
@@ -399,6 +408,14 @@ void CrossIntersection(Car *car) {
     
     printCurrentAction(elapsedTime, car);
     
+    //printf("Car %d trying to release lock\n", car->cid);
+    release_frontLineLock(&frontLineNorth, &frontLineNorthCond, waitingNorth);
+    release_frontLineLock(&frontLineSouth, &frontLineSouthCond, waitingSouth);
+    release_frontLineLock(&frontLineEast, &frontLineEastCond, waitingEast);
+    release_frontLineLock(&frontLineWest, &frontLineWestCond, waitingWest);
+    
+    
+    
     
 }
 
@@ -411,11 +428,13 @@ void *Car_Arrived(void *arrivedCar) {
     //pthread_mutex_lock(&travelEastBound);
     struct Car *car = arrivedCar;
     
-    printf("Car Arrived\n");
-    car->action = arriving;
-    printCurrentAction(car->arrival_time, car);
+    //printf("Car Arrived\n");
+    //car->action = arriving;
+    //printCurrentAction(car->arrival_time, car);
+    //printCurrentAction(elapsedTime, car);
     
-    ArriveIntersection(&car->dir);
+    
+    ArriveIntersection(car);
     CrossIntersection(car);
     ExitIntersection(car);
     
@@ -425,6 +444,9 @@ void *Car_Arrived(void *arrivedCar) {
 //===================================================================
 
 int main(int argc, const char * argv[]) {
+    // insert code here...
+    printf("Simulation Starting...\n");
+
     Car cars[8];
     
     
@@ -494,16 +516,33 @@ int main(int argc, const char * argv[]) {
         
         usleep(time);
         //printf("cid  arrival_time  dir_original  dir_target\n");
-        carInitialization(i, cars, 7);
-        cars[id].arrival_time = time;
+        carInitialization(i, cars, 8);
+        //fflush(stdout);
+        //cars[id].arrival_time = time;
         //elapsedTime += time;
         pthread_create(&threadid[i],&attr1, Car_Arrived, (void *) &cars[i]);
     }
-
+    /*
+    usleep(1.1);
+    carInitialization(id, cars, 7);
+    pthread_create(&threadid[id], &attr1, Car_Arrived, (void *) &cars[id].dir);
+    id++;
+    
+    usleep(2.0);
+    carInitialization(id, cars, 7);
+    pthread_create(&threadid[id],&attr1, Car_Arrived, (void *) &cars[id].dir);
+    id++;
+    
+    usleep(3.3);
+    carInitialization(id, cars, 7);
+    pthread_create(&threadid[id],&attr1, Car_Arrived, (void *) &cars[id].dir);
+    id++;
+    */
     
     //pthread_create
     printf("usleep done\n");
-    /*
+    
+    
     pthread_attr_destroy(&attr1);
     pthread_mutex_destroy(&frontLineNorth);
     pthread_cond_destroy(&frontLineNorthCond);
@@ -513,7 +552,7 @@ int main(int argc, const char * argv[]) {
     pthread_cond_destroy(&frontLineEastCond);
     pthread_mutex_destroy(&frontLineWest);
     pthread_cond_destroy(&frontLineWestCond);
-    pthread_exit(NULL);*/
+    
     
     return 0;
 }
