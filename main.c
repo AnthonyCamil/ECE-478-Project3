@@ -252,11 +252,11 @@ void carInitialization(int i, Car cars[], int n) {
     */
 }
 
-void printCurrentAction(float time, Car car) {
+void printCurrentAction(float time, Car *car) {
     char currentAction[8] = "0";
     currentAction[0] = '\0';
     
-    switch (car.currentAction) {
+    switch (car->currentAction) {
         case arriving:
             strcpy(currentAction, "arriving");
             break;
@@ -277,7 +277,7 @@ void printCurrentAction(float time, Car car) {
             break;
     }
     
-    printf("Time  %.1f: Car %d (->%c ->%c) %s\n", time, car.cid, car.dir.dir_original, car.dir.dir_target, currentAction);
+    printf("Time  %.1f: Car %d (->%c ->%c) %s\n", time, car->cid, car->dir.dir_original, car->dir.dir_target, currentAction);
     
 }
 
@@ -398,6 +398,7 @@ void CrossIntersection(Car *car) {
         if (car->dir.dir_target == 'N') elapsedTime += doTurnRight();
         if (car->dir.dir_target == 'S') elapsedTime += doTurnLeft();
     }
+    printCurrentAction(elapsedTime, car);
 }
 
 void ExitIntersection(Car *car) {
